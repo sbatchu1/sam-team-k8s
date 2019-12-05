@@ -74,5 +74,7 @@ spec:
                 name: sam-vault-token
                 # Specify the key associated with the value
                 key: VAULT_DEV_ROOT_TOKEN_ID
+          - name: VAULT_DEV_LISTEN_ADDRESS
+            value: 0.0.0.0:8200
 status: {}
 ---
