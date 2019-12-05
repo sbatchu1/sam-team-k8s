@@ -1,0 +1,79 @@
+# ---
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: sam-master-volume
+# spec:
+#   storageClassName: manual
+#   capacity:
+#     storage: 1Gi
+#   accessModes:
+#     - ReadWriteOnce
+#   hostPath:
+#     path: "/mnt/data"
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: sam-node-volume
+#   labels:
+#     type: local
+# spec:
+#   storageClassName: manual
+#   capacity:
+#     storage: 1Gi
+#   accessModes:
+#     - ReadWriteOnce
+#   hostPath:
+#     path: "/mnt/data"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sam-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sam-master-claim
+spec:
+  storageClassName: sam-volume #this is the connecting point to volume and volumeclaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sam-node-claim
+spec:
+  storageClassName: sam-volume #this is the connecting point to volume and volumeclaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sam-mysql-claim
+spec:
+  storageClassName: sam-volume #this is the connecting point to volume and volumeclaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
