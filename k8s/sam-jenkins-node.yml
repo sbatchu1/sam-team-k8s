@@ -16,6 +16,115 @@ spec:
 status:
   loadBalancer: {}
 ---
+apiVersion: v1
+data:
+  create-node.sh: |-
+    #! /usr/bin/env bash
+    # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+    set -euox pipefail
+    IFS=$'\n\t'
+
+    function usage {
+        echo '$0 <jenkins_url> <node_name> <credentials>'
+        echo '  for example $0 http://localhost:8080 node1 admin:e1cb1ad4942f452e8a0c875fc0ba9106'
+    }
+
+    if [[ -z ${1:-} ]]; then
+        usage && exit 1
+    fi
+
+    if [[ -z $2 ]]; then
+        usage && exit 1
+    fi
+
+    if [[ -z $3 ]]; then
+        usage && exit 1
+    fi
+
+    if [[ ! -f jenkins-cli.jar ]]; then
+        wget --quiet $1/jnlpJars/jenkins-cli.jar
+    fi
+
+    cat << EOF | java -jar jenkins-cli.jar -s $1 -auth $3 create-node $2
+    <?xml version='1.1' encoding='UTF-8'?>
+    <slave>
+      <name>$2</name>
+      <description></description>
+      <remoteFS>/tmp/$2</remoteFS>
+      <numExecutors>1</numExecutors>
+      <mode>NORMAL</mode>
+      <retentionStrategy class="hudson.slaves.RetentionStrategy\$Always"/>
+      <launcher class="hudson.slaves.JNLPLauncher">
+        <workDirSettings>
+          <disabled>false</disabled>
+          <internalDir>remoting</internalDir>
+          <failIfWorkDirIsMissing>false</failIfWorkDirIsMissing>
+        </workDirSettings>
+      </launcher>
+      <label></label>
+      <nodeProperties/>
+    EOF
+
+    exit 0
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: create-node
+  namespace: sam
+---
+apiVersion: v1
+data:
+  connect-node.sh: |-
+    #! /usr/bin/env bash
+    # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+    set -euox pipefail
+    IFS=$'\n\t'
+
+    function usage {
+        cat << EOF
+    Usage: $0 <url> <node-name> <authentication>
+
+    Example:
+        $0 http://localhost:8080 blue-node admin:e1cb1ad4942f452e8a0c875fc0ba9106
+    EOF
+    exit 1
+
+    }
+
+    if [[ -z ${1:-} ]]; then
+        usage
+    fi
+    url=$1
+
+    if [[ -z ${2:-} ]]; then
+        usage
+    fi
+    node=$2
+
+    if [[ -z ${3:-} ]]; then
+        usage
+    fi
+    auth=$3
+
+    if [[ ! -f agent.jar ]]; then
+        wget --quiet $url/jnlpJars/agent.jar
+    fi
+
+    if ! command -v java; then
+        echo 'Error, java not found'
+        exit 1
+    fi
+
+    secret=$(curl -u $auth $url/computer/$node/slave-agent.jnlp | sed "s/.*<application-desc main-class=\"hudson.remoting.jnlp.Main\"><argument>\([a-z0-9]*\).*/\1/")
+    java -jar agent.jar -jnlpUrl $url/computer/$node/slave-agent.jnlp -workDir "/tmp/foo" -secret $secret
+
+    exit 0
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: connect-node
+  namespace: sam
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,9 +146,28 @@ spec:
         app: sam-jenkins-node
     spec:
       containers:
-      - image: openjdk:8
+      - image: ubuntu
         name: jenkins-node
         resources: {}
+        command:
+          - /bin/bash
+          - -c
+          - echo 'hellooooooooooooooooo'
+          - sleep 100
+        #command: ["/bin/bash", "/var/lib/connect-node.sh","http://sam-jenkins-master:8080","sam-node","admin:$MY_VALUE"]
+        # command: ["/bin/bash", "touch test.txt", "sleep 1000"]
+        volumeMounts:
+          - name: connect-node-volume
+            mountPath: /var/lib/connect-node.sh
+            subPath: connect-node.sh  
+        env:
+          - name: MY_VALUE
+            valueFrom:
+              configMapKeyRef:
+                # The ConfigMap containing the value you want to assign to SPECIAL_LEVEL_KEY
+                name: sam-jenkins-password
+                # Specify the key associated with the value
+                key: JENKINS-PASSWORD
       #   volumeMounts:
       #   - mountPath: /var/lib/jenkins
       #     name: sam-node-volume  #name of the volume to mount on
@@ -47,4 +175,19 @@ spec:
       #   - name: sam-node-volume
       #     persistentVolumeClaim:
       #       claimName: sam-node-claim
+      # - image: ubuntu
+      #   name: ubuntu-agent
+      #   volumeMounts:
+      #   - name: create-node-volume
+      #     mountPath: /var/lib/create-node.sh
+      #     subPath: create-node.sh
+      volumes:
+        - name: create-node-volume
+          configMap:
+            name: create-node
+        - name: connect-node-volume
+          configMap:
+            name: connect-node
 status: {}
+---
+
