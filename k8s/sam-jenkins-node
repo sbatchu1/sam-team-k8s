@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: sam-jenkins-node
+  name: sam-jenkins-node
+  namespace: sam
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sam-jenkins-node
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: sam-jenkins-node
+    spec:
+      containers:
+      - image: jenkins
+        name: jenkins
+        resources: {}
+status: {}
